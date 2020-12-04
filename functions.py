@@ -69,18 +69,19 @@ def activation_weights(net, im, list_layers):
     return H
  
 def process_results(opts_dir, net_dir): 
-    files = list(os.scandir(opts_dir))
-    files2 = list(os.scandir(net_dir))
+    files = sorted(os.scandir(opts_dir), key=lambda e: e.name)
+    files2 = sorted(os.scandir(net_dir), key=lambda e: e.name) 
     C = {'ac' : np.zeros((1000), dtype = int), 'ppv' : np.zeros((1000), dtype = int), 'npv' : np.zeros((1000), dtype = int), 'cm' : np.zeros((1000, 2, 2), dtype = int),
         'spc' : np.zeros((1000), dtype = int), 'sen' : np.zeros((1000), dtype = int), 'auc' : np.zeros((1000), dtype = int),
         'ax' : np.zeros((1000, 3), dtype = int), 'ay' : np.zeros((1000, 3), dtype = int), 'cnt' : 1}
     A = [[]] * 3
+    metric_stats = []
     list_layers = ['conv_1', 'conv_2', 'conv_3']
     
     for i in range(0, len(files)):
-        if files[i].is_file():
+        if os.path.isfile(files[i]):
             f = open(files[i], "rb")
-            d = pickle,load(f) 
+            d = pickle.load(f) 
             f.close()
             
             tt = d['T']['ytest'].flatten() 
@@ -101,21 +102,23 @@ def process_results(opts_dir, net_dir):
                 C['ax'][C['cnt']] = ax
                 C['ay'][C['cnt']] = ay
                 C['cnt'] = C['cnt'] + 1
-                
+            
+            
             for j in os.scandir(files2[i]):
                 net = tf.keras.models.load_model(j)
                 for tt in d['T']['xtest']:
-                    H = activation_weights(j, tt, list_layers)
+                    H = activation_weights(net, tt, list_layers)
                     for k in range(0, len(A)):
                         if (len(A[k]) == 0):
                             A[k] = H[k]
                         else: 
-                            A[k] = A[k] + H[k]
-                            
+                            A[k] = A[k] + H[k]  
+    
     for i in range(0, len(A)):
-        A[i] = (A[i] - A[i].min()) / A[i].max()  
-    C['ac_avg'] = C['ac'].mean(axis = 0)
-    return C, A
+        A[i] = (A[i] - A[i].min()) / A[i].max() 
+        
+    metric_stats = {'ac_mean' : C['ac'].mean(axis=0), 'ac_std' : C['ac'].std(axis=0), 'ac_mean_minus_std' : C['ac'].mean(axis=0) - C['ac'].std(axis=0), 'ppv_mean' : C['ppv'].mean(axis=0), 'ppv_std' : C['ppv'].std(axis=0), 'ppv_mean_minus_std' : C['ppv'].mean(axis=0) - C['ppv'].std(axis=0), 'npv_mean' : C['npv'].mean(axis=0), 'npv_std' : C['npv'].std(axis=0), 'npv_mean_minus_std' : C['npv'].mean(axis=0) - C['npv'].std(axis=0), 'sen_mean' : C['sen'].mean(axis=0), 'sen_std' : C['sen'].std(axis=0), 'sen_mean_minus_std' : C['sen'].mean(axis=0) - C['sen'].std(axis=0), 'spc_mean' : C['spc'].mean(axis=0), 'spc_std' : C['spc'].std(axis=0), 'spc_mean_minus_std' : C['spc'].mean(axis=0) - C['spc'].std(axis=0), 'auc_mean' : C['auc'].mean(axis=0), 'auc_std' : C['auc'].std(axis=0), 'auc_mean_minus_std' : C['auc'].mean(axis=0) - C['auc'].std(axis=0), 'ax_mean' : C['ax'].mean(axis=0), 'ax_std' : C['ax'].std(axis=0), 'ax_mean_minus_std' : C['ax'].mean(axis=0) - C['ax'].std(axis=0), 'ay_mean' : C['ay'].mean(axis=0), 'ay_std' : C['ay'].std(axis=0), 'ay_mean_minus_std' : C['ay'].mean(axis=0) - C['ay'].std(axis=0)} 
+    return C, A, metric_stats
 
 def show_activations(A):
     fig1, ax1 = plt.subplots()
@@ -143,9 +146,9 @@ def grid_results(folder):
     A = []
     F = []
     
-    files = os.scandir(folder)            
+    files = sorted(os.scandir(folder), key=lambda e: e.name)           
     for path in files:
-        if path.is_file():
+        if os.path.isfile(path):
             f = open(path, "rb")
             opts = pickle.load(f) 
             f.close()
@@ -156,29 +159,33 @@ def grid_results(folder):
             P.append(p)
             A.append(opts['acc'])
             F.append(f.name)
-            f.close()
-    D = {'P' : np.asarray(P), 'A' : np.asarray(A), 'F' : np.asarray(F)}
-    opts = optimal_grid_parameters(D)
-    return D, opts
+    D = {'P' : P, 'A' : np.asarray(A), 'F' : F}
+    opts, opt_params_stats = optimal_grid_parameters(D)
+    return D, opts, opt_params_stats
 
 def optimal_grid_parameters(D):
-    idx = np.argmax(D['A'].mean(axis= 1) - D['A'].std(axis=1))
-    P = D['P'][idx, :]
-    opts = {'lr' : P[0], 'mx_epochs' : P[1].astype(int), 'val_freq' : P[2].astype(int).item(), 'F1S' : P[3].astype(int), 
-            'F1N' : P[4].astype(int), 'F2S' : P[5].astype(int), 'F2N' : P[6].astype(int), 'F3S' : P[7].astype(int), 'F3N' : P[8].astype(int), 'batch_size' : P[9].astype(int)}
-    return opts
+    a = D['A'].mean(axis=1)
+    b = D['A'].mean(axis=1) - D['A'].std(axis = 1)
+    idx = np.argmax(b)
+    opt_params_stats = {'max_mean_acc' : a.max(), 'max_ma_D_idx' : np.argmax(a), 'max_mean_acc_min_std' : b.max(), 'max_mams_D_idx' : idx}
+    P = D['P'][idx]
+    opts = {'lr' : P[0], 'mx_epochs' : P[1], 'val_freq' : P[2], 'F1S' : P[3], 
+            'F1N' : P[4], 'F2S' : P[5], 'F2N' : P[6], 'F3S' : P[7], 'F3N' : P[8], 'batch_size' : P[9]}
+    return opts, opt_params_stats
 
 def process_slice(opts_dir, net_dir):
-    files = list(os.scandir(opts_dir))
-    files2 = list(os.scandir(net_dir))
+    files = sorted(os.scandir(opts_dir), key=lambda e: e.name) 
+    files2 = sorted(os.scandir(net_dir), key=lambda e: e.name) 
     C = []
+    metric_stats = []
     cnt = 0
     pslice = [0] * 156        
     list_layers = ['conv_1', 'conv_2', 'conv_3']
+    
     for i in range(0, len(files)):
-        if files[i].is_file():
+        if os.path.isfile(files[i]):
             f = open(files[i], "rb")
-            d = pickle,load(f) 
+            d = pickle.load(f) 
             f.close()
             A = [[]] * 3
             tt = d['T']['ytest'].flatten() 
@@ -194,14 +201,28 @@ def process_slice(opts_dir, net_dir):
                 C[cnt]['ppv'][j] = cm[0, 0] / np.sum(cm[0, :])
                 C[cnt]['npv'][j] = cm[1, 1] / np.sum(cm[1, :])
             
+            metric_stats.append({'ac_mean' : C[cnt]['ac'].mean(axis=0), 'ac_std' : C[cnt]['ac'].std(axis=0), 'ac_mean_minus_std' : C[cnt]['ac'].mean(axis=0) - C[cnt]['ac'].std(axis=0), 'ppv_mean' : C[cnt]['ppv'].mean(axis=0), 'ppv_std' : C[cnt]['ppv'].std(axis=0), 'ppv_mean_minus_std' : C[cnt]['ppv'].mean(axis=0) - C[cnt]['ppv'].std(axis=0), 'npv_mean' : C[cnt]['npv'].mean(axis=0), 'npv_std' : C[cnt]['npv'].std(axis=0), 'npv_mean_minus_std' : C[cnt]['npv'].mean(axis=0) - C[cnt]['npv'].std(axis=0)})
+            
             for j in os.scandir(files2[i]):
                 net = tf.keras.models.load_model(j)
-                H = activation_weights(j, d['T']['xtest'][0], list_layers)
-                for k in range(0, len(A)):
-                    if (len(A[k]) == 0):
-                        A[k] = H[k]
-                    else: 
-                        A[k] = A[k] + H[k]
+                for tt in d['T']['xtest']:
+                    H = activation_weights(net, tt, list_layers)
+                    for k in range(0, len(A)):
+                        if (len(A[k]) == 0):
+                            A[k] = H[k]
+                        else: 
+                            A[k] = A[k] + H[k]
+                            
+            #for j in os.scandir(files2[i]):
+                #net = tf.keras.models.load_model(j)
+                #H = activation_weights(net, d['T']['xtest'][0], list_layers)
+                #for k in range(0, len(A)):
+                    #if (len(A[k]) == 0):
+                        #A[k] = H[k]
+                    #else: 
+                        #A[k] = A[k] + H[k]
+        # if takes too long do this
+                        
             for i in range(0, len(A)):
                 A[i] = (A[i] - A[i].min()) / A[i].max()  
             
@@ -209,7 +230,7 @@ def process_slice(opts_dir, net_dir):
             C[cnt]['A'] = A
             cnt = cnt + 1
             d = []
-    return C, pslice
+    return C, pslice, metric_stats
 
 def slice_results(folder):
     P = []
@@ -217,9 +238,9 @@ def slice_results(folder):
     F = []
     S = []
     
-    files = os.scandir(folder)            
+    files = sorted(os.scandir(folder), key=lambda e: e.name)           
     for path in files:
-        if path.is_file():
+        if os.path.isfile(path):
             f = open(path, "rb")
             opts = pickle.load(f) 
             f.close()
@@ -231,15 +252,17 @@ def slice_results(folder):
             A.append(opts['acc'])
             F.append(f.name)
             S.append(opts['jj'])
-            f.close()
-    D = {'P' : np.asarray(P), 'A' : np.asarray(A), 'F' : np.asarray(F), 'S' : np.asarray(S)}
-    opts = optimal_slice(D)
-    return D, opts
+    D = {'P' : P, 'A' : np.asarray(A), 'F' : F, 'S' : S}
+    opts, opt_slice_stats = optimal_slice(D)
+    return D, opts, opt_slice_stats
 
 def optimal_slice(D):
-    idx = np.argmax(D['A'].mean(axis= 1) - D['A'].std(axis=1))
-    P = D['P'][idx, :]
+    a = D['A'].mean(axis=1)
+    b = D['A'].mean(axis=1) - D['A'].std(axis = 1)
+    idx = np.argmax(b)
+    opt_slice_stats = {'max_mean_acc' : a.max(), 'max_ma_D_idx' : np.argmax(a), 'max_mean_acc_min_std' : b.max(), 'max_mams_D_idx' : idx}
+    P = D['P'][idx]
     S = D['S'][idx]
-    opts = {'lr' : P[0], 'mx_epochs' : P[1].astype(int), 'val_freq' : P[2].astype(int).item(), 'F1S' : P[3].astype(int), 
-            'F1N' : P[4].astype(int), 'F2S' : P[5].astype(int), 'F2N' : P[6].astype(int), 'F3S' : P[7].astype(int), 'F3N' : P[8].astype(int), 'batch_size' : P[9].astype(int), 'jj' : S.astype(int), 'P' : './Data/P_left_sm.mat', 'C' : './Data/C_sm.mat', 'res_dir' : './optimal_slice'}
-    return opts
+    opts = {'lr' : P[0], 'mx_epochs' : P[1], 'val_freq' : P[2], 'F1S' : P[3], 
+            'F1N' : P[4], 'F2S' : P[5], 'F2N' : P[6], 'F3S' : P[7], 'F3N' : P[8], 'batch_size' : P[9], 'jj' : S, 'P' : './Data/P_left_sm.mat', 'C' : './Data/C_sm.mat', 'res_dir' : './run_opt_cv_opts'}
+    return opts, opt_slice_stats

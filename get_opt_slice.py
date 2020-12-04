@@ -3,11 +3,7 @@ import pickle
 import numpy as np
 
 folder = './run_slice_opts'
-D, opts = slice_results(folder)
-
-a = D['A'].mean(axis=1)
-b = D['A'].mean(axis=1) - D['A'].std(axis = 1)
-opt_slice_stats = {'max_mean_acc' : a.max(), 'max_ma_D_idx' : np.argmax(a), 'max_mean_acc_min_std' : b.max(), 'max_mams_D_idx' : np.argmax(b)}
+D, opts, opt_slice_stats = slice_results(folder)
 
 f = open('./optimal_slice/opt_slice_opts.pkl',"wb")
 pickle.dump(opts, f)

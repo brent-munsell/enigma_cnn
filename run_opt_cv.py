@@ -61,6 +61,6 @@ for j in range(0, len(S['ytrain'])):
     dt2 = now.strftime("%m-%d-%y-%H-%M-%S-%f")
     net.save('./run_opt_cv_nets/nets_{0:d}/net_{1:s}'.format(dt, dt2))
 
-f = open('./run_opt_cv_opts/cv_opts_{0:d}.pkl'.format(dt),"wb")
+f = open('{0:s}/cv_opts_{1:d}.pkl'.format(opts['res_dir'], dt),"wb")
 pickle.dump(opts, f)
 f.close()
