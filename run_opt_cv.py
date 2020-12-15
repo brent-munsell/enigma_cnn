@@ -10,10 +10,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("slice", type = int)
 parser.add_argument("dt", type = str)
 args = parser.parse_args()
-jj = args.slice
 dt = args.dt
 
-os.mkdir('./run_opt_cv_nets/nets_{0:d}'.format(dt))
+os.mkdir('./run_opt_cv_nets/nets_{0:s}'.format(dt))
 
 f = open('./optimal_slice/opt_slice_opts.pkl', "rb")
 opts = pickle.load(f) 
@@ -59,8 +58,8 @@ for j in range(0, len(S['ytrain'])):
     
     now = datetime.now() # current date and time
     dt2 = now.strftime("%m-%d-%y-%H-%M-%S-%f")
-    net.save('./run_opt_cv_nets/nets_{0:d}/net_{1:s}'.format(dt, dt2))
+    net.save('./run_opt_cv_nets/nets_{0:s}/net_{1:s}'.format(dt, dt2))
 
-f = open('{0:s}/cv_opts_{1:d}.pkl'.format(opts['res_dir'], dt),"wb")
+f = open('{0:s}/cv_opts_{1:s}.pkl'.format(opts['res_dir'], dt),"wb")
 pickle.dump(opts, f)
 f.close()

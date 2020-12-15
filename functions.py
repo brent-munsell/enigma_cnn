@@ -63,7 +63,7 @@ def activation_weights(net, im, list_layers):
         act1 = activations([q, 0])
         imgSize = im.shape[0:2]
         _, _, _, maxValueIndex = np.where(act1 >= act1.max())
-        act1chMax = act1[:, :, :, maxValueIndex]
+        act1chMax = act1[:, :, :, maxValueIndex[0]]
         act1chMax = (act1chMax - act1chMax.min()) / act1chMax.max()
         H[i] = act1chMax
     return H
@@ -71,9 +71,9 @@ def activation_weights(net, im, list_layers):
 def process_results(opts_dir, net_dir): 
     files = sorted(os.scandir(opts_dir), key=lambda e: e.name)
     files2 = sorted(os.scandir(net_dir), key=lambda e: e.name) 
-    C = {'ac' : np.zeros((1000), dtype = int), 'ppv' : np.zeros((1000), dtype = int), 'npv' : np.zeros((1000), dtype = int), 'cm' : np.zeros((1000, 2, 2), dtype = int),
-        'spc' : np.zeros((1000), dtype = int), 'sen' : np.zeros((1000), dtype = int), 'auc' : np.zeros((1000), dtype = int),
-        'ax' : np.zeros((1000, 3), dtype = int), 'ay' : np.zeros((1000, 3), dtype = int), 'cnt' : 1}
+    C = {'ac' : np.zeros((1000), dtype = float), 'ppv' : np.zeros((1000), dtype = float), 'npv' : np.zeros((1000), dtype = float), 'cm' : np.zeros((1000, 2, 2), dtype = int),
+        'spc' : np.zeros((1000), dtype = float), 'sen' : np.zeros((1000), dtype = float), 'auc' : np.zeros((1000), dtype = float),
+        'ax' : [None] * 1000, 'ay' : [None] * 1000, 'cnt' : 0}
     A = [[]] * 3
     metric_stats = []
     list_layers = ['conv_1', 'conv_2', 'conv_3']
@@ -117,7 +117,7 @@ def process_results(opts_dir, net_dir):
     for i in range(0, len(A)):
         A[i] = (A[i] - A[i].min()) / A[i].max() 
         
-    metric_stats = {'ac_mean' : C['ac'].mean(axis=0), 'ac_std' : C['ac'].std(axis=0), 'ac_mean_minus_std' : C['ac'].mean(axis=0) - C['ac'].std(axis=0), 'ppv_mean' : C['ppv'].mean(axis=0), 'ppv_std' : C['ppv'].std(axis=0), 'ppv_mean_minus_std' : C['ppv'].mean(axis=0) - C['ppv'].std(axis=0), 'npv_mean' : C['npv'].mean(axis=0), 'npv_std' : C['npv'].std(axis=0), 'npv_mean_minus_std' : C['npv'].mean(axis=0) - C['npv'].std(axis=0), 'sen_mean' : C['sen'].mean(axis=0), 'sen_std' : C['sen'].std(axis=0), 'sen_mean_minus_std' : C['sen'].mean(axis=0) - C['sen'].std(axis=0), 'spc_mean' : C['spc'].mean(axis=0), 'spc_std' : C['spc'].std(axis=0), 'spc_mean_minus_std' : C['spc'].mean(axis=0) - C['spc'].std(axis=0), 'auc_mean' : C['auc'].mean(axis=0), 'auc_std' : C['auc'].std(axis=0), 'auc_mean_minus_std' : C['auc'].mean(axis=0) - C['auc'].std(axis=0), 'ax_mean' : C['ax'].mean(axis=0), 'ax_std' : C['ax'].std(axis=0), 'ax_mean_minus_std' : C['ax'].mean(axis=0) - C['ax'].std(axis=0), 'ay_mean' : C['ay'].mean(axis=0), 'ay_std' : C['ay'].std(axis=0), 'ay_mean_minus_std' : C['ay'].mean(axis=0) - C['ay'].std(axis=0)} 
+    metric_stats = {'ac_mean' : C['ac'].mean(axis=0), 'ac_std' : C['ac'].std(axis=0), 'ac_mean_minus_std' : C['ac'].mean(axis=0) - C['ac'].std(axis=0), 'ppv_mean' : C['ppv'].mean(axis=0), 'ppv_std' : C['ppv'].std(axis=0), 'ppv_mean_minus_std' : C['ppv'].mean(axis=0) - C['ppv'].std(axis=0), 'npv_mean' : C['npv'].mean(axis=0), 'npv_std' : C['npv'].std(axis=0), 'npv_mean_minus_std' : C['npv'].mean(axis=0) - C['npv'].std(axis=0), 'sen_mean' : C['sen'].mean(axis=0), 'sen_std' : C['sen'].std(axis=0), 'sen_mean_minus_std' : C['sen'].mean(axis=0) - C['sen'].std(axis=0), 'spc_mean' : C['spc'].mean(axis=0), 'spc_std' : C['spc'].std(axis=0), 'spc_mean_minus_std' : C['spc'].mean(axis=0) - C['spc'].std(axis=0), 'auc_mean' : C['auc'].mean(axis=0), 'auc_std' : C['auc'].std(axis=0), 'auc_mean_minus_std' : C['auc'].mean(axis=0) - C['auc'].std(axis=0)} 
     return C, A, metric_stats
 
 def show_activations(A):
@@ -125,11 +125,11 @@ def show_activations(A):
     fig2, ax2 = plt.subplots()
     fix2, ax3 = plt.subplots()
     ax1.set_title('conv_1 activations')
-    ax1.imshow(A[0][0, :, :, 0], cmap="hot")
+    ax1.imshow(A[0][0, :, :], cmap="hot")
     ax2.set_title('conv_2 activations')
-    ax2.imshow(A[1][0, :, :, 0], cmap="hot")
+    ax2.imshow(A[1][0, :, :], cmap="hot")
     ax3.set_title('conv_3 activations')
-    ax3.imshow(A[2][0, :, :, 0], cmap="hot")
+    ax3.imshow(A[2][0, :, :], cmap="hot")
     return fig1, fig2, fig3
 
 def plot_roc(C):
@@ -179,7 +179,7 @@ def process_slice(opts_dir, net_dir):
     C = []
     metric_stats = []
     cnt = 0
-    pslice = [0] * 156        
+    pslice = [0] * 157        
     list_layers = ['conv_1', 'conv_2', 'conv_3']
     
     for i in range(0, len(files)):
@@ -190,8 +190,8 @@ def process_slice(opts_dir, net_dir):
             A = [[]] * 3
             tt = d['T']['ytest'].flatten() 
             C.append({'slice' : d['jj'], 'cm' : np.zeros((2, 2), dtype = int),
-                      'ac' : np.zeros(len(d['ypred']), dtype = int), 'ppv' : np.zeros(len(d['ypred']), dtype = int),
-                      'npv' : np.zeros(len(d['ypred']), dtype = int), 'A' : []})
+                      'ac' : np.zeros(len(d['ypred']), dtype = float), 'ppv' : np.zeros(len(d['ypred']), dtype = float),
+                      'npv' : np.zeros(len(d['ypred']), dtype = float), 'A' : []})
             for j in range(0, len(d['ypred'])):
                 pp = d['ypred'][j].flatten() 
                 cm = tf.math.confusion_matrix(tt, pp).numpy()
@@ -202,34 +202,22 @@ def process_slice(opts_dir, net_dir):
                 C[cnt]['npv'][j] = cm[1, 1] / np.sum(cm[1, :])
             
             metric_stats.append({'ac_mean' : C[cnt]['ac'].mean(axis=0), 'ac_std' : C[cnt]['ac'].std(axis=0), 'ac_mean_minus_std' : C[cnt]['ac'].mean(axis=0) - C[cnt]['ac'].std(axis=0), 'ppv_mean' : C[cnt]['ppv'].mean(axis=0), 'ppv_std' : C[cnt]['ppv'].std(axis=0), 'ppv_mean_minus_std' : C[cnt]['ppv'].mean(axis=0) - C[cnt]['ppv'].std(axis=0), 'npv_mean' : C[cnt]['npv'].mean(axis=0), 'npv_std' : C[cnt]['npv'].std(axis=0), 'npv_mean_minus_std' : C[cnt]['npv'].mean(axis=0) - C[cnt]['npv'].std(axis=0)})
-            
+                            
             for j in os.scandir(files2[i]):
                 net = tf.keras.models.load_model(j)
-                for tt in d['T']['xtest']:
-                    H = activation_weights(net, tt, list_layers)
-                    for k in range(0, len(A)):
-                        if (len(A[k]) == 0):
-                            A[k] = H[k]
-                        else: 
-                            A[k] = A[k] + H[k]
-                            
-            #for j in os.scandir(files2[i]):
-                #net = tf.keras.models.load_model(j)
-                #H = activation_weights(net, d['T']['xtest'][0], list_layers)
-                #for k in range(0, len(A)):
-                    #if (len(A[k]) == 0):
-                        #A[k] = H[k]
-                    #else: 
-                        #A[k] = A[k] + H[k]
-        # if takes too long do this
-                        
-            for i in range(0, len(A)):
-                A[i] = (A[i] - A[i].min()) / A[i].max()  
+                H = activation_weights(net, d['T']['xtest'][0], list_layers)
+                for k in range(0, len(A)):
+                    if (len(A[k]) == 0):
+                        A[k] = H[k]
+                    else: 
+                        A[k] = A[k] + H[k]  
+            
+            for m in range(0, len(A)):
+                A[m] = (A[m] - A[m].min()) / A[m].max() 
             
             pslice[C[cnt]['slice']] = 1
             C[cnt]['A'] = A
             cnt = cnt + 1
-            d = []
     return C, pslice, metric_stats
 
 def slice_results(folder):
